@@ -65,4 +65,25 @@ class Kernel extends HttpKernel
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
     ];
+    protected function schedule(Schedule $schedule)
+    {
+        $schedule->call(function () {
+            $threshold = now()->subDays(3); // assuming 3 days
+            $leaveRequests = LeaveRequest::where('status', 'pending')
+                ->where('created_at', '<=', $threshold)
+                ->get();
+
+            foreach ($leaveRequests as $request) {
+                $request->update(['status' => 'approved']);
+
+                // Record to history
+                $history = new LeaveHistory([
+                    'action' => 'auto-approved',
+                    'action_by' => null, // since it's automatic
+                ]);
+                $request->histories()->save($history);
+            }
+        })->daily();
+    }
+
 }
